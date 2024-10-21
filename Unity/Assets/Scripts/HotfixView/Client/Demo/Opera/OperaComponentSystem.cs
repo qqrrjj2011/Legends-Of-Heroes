@@ -1,3 +1,4 @@
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace ET.Client
@@ -21,7 +22,7 @@ namespace ET.Client
                 RaycastHit hit;
                 if (Physics.Raycast(ray, out hit, 1000, self.mapMask))
                 {
-                    C2M_PathfindingResult c2MPathfindingResult = new C2M_PathfindingResult();
+                    C2M_PathfindingResult c2MPathfindingResult = C2M_PathfindingResult.Create();
                     c2MPathfindingResult.Position = hit.point;
                     self.Root().GetComponent<ClientSenderComponent>().Send(c2MPathfindingResult);
                 }
@@ -48,6 +49,15 @@ namespace ET.Client
                 C2M_TransferMap c2MTransferMap = C2M_TransferMap.Create();
                 self.Root().GetComponent<ClientSenderComponent>().Call(c2MTransferMap).Coroutine();
             }
+
+            if (Input.GetKeyDown(KeyCode.J))
+            {
+                self.OnClickSkill1();
+            }
+            if (Input.GetKeyDown(KeyCode.K))
+            {
+                self.OnClickSkill2();
+            }
         }
         
         private static async ETTask Test1(this OperaComponent self)
@@ -70,5 +80,61 @@ namespace ET.Client
             }
             Log.Debug($"Croutine 2 end2");
         }
+
+        [EntitySystem]
+        private static void LateUpdate(this OperaComponent self)
+        {
+            //每帧把当前帧收集的操作发送给服务端，随后清除
+            if (self.OperateInfos.Count == 0)
+                return;
+            self.OperateInfosTemp.Clear();
+            self.OperateInfosTemp.AddRange(self.OperateInfos);
+            C2Room_Operation c2RoomOperation = C2Room_Operation.Create();
+            c2RoomOperation.OperateInfos = self.OperateInfosTemp;
+            self.Root().GetComponent<ClientSenderComponent>().Send(c2RoomOperation);
+            self.OperateInfos.Clear();
+        }
+
+        public static void OnClickSkill1(this OperaComponent self)
+        {
+            //可在此处检测技能是否可释放（蓝量、CD、僵直等判定）
+            Log.Info($"press skill1");
+            OperateInfo operateInfo = OperateInfo.Create();
+            operateInfo.OperateType = (int)EOperateType.Skill1;
+            operateInfo.InputType = (int)EInputType.KeyDown;
+            self.OperateInfos.Add(operateInfo);
+        }
+
+        public static void OnClickSkill2(this OperaComponent self)
+        {
+            //可在此处检测技能是否可释放（蓝量、CD、僵直等判定）
+            Log.Info($"press skill2");
+            OperateInfo operateInfo = OperateInfo.Create();
+            operateInfo.OperateType = (int)EOperateType.Skill2;
+            operateInfo.InputType = (int)EInputType.KeyDown;
+            self.OperateInfos.Add(operateInfo);
+        }
+
+        public static void OnMove(this OperaComponent self, Vector2 v2)
+        {
+            Log.Info($"press joystick: {v2}");
+            // C2M_JoystickMove c2mJoystickMove = new C2M_JoystickMove() { MoveForward = new float3(v2.x, 0, v2.y) };
+            // self.ClientScene().GetComponent<PlayerSessionComponent>().Session.Send(c2mJoystickMove);
+            OperateInfo operateInfo = OperateInfo.Create();
+            operateInfo.OperateType = (int)EOperateType.Move;
+            operateInfo.InputType = (int)EInputType.KeyDown;
+            operateInfo.Vec3 = new float3(v2.x, 0, v2.y);
+            self.OperateInfos.Add(operateInfo);
+        }
+        public static void StopMove(this OperaComponent self)
+        {
+            // C2M_JoystickMove c2mJoystickMove = new C2M_JoystickMove() { MoveForward = new float3(v2.x, 0, v2.y) };
+            // self.ClientScene().GetComponent<PlayerSessionComponent>().Session.Send(c2mJoystickMove);
+            OperateInfo operateInfo = OperateInfo.Create();
+            operateInfo.OperateType = (int)EOperateType.Move;
+            operateInfo.InputType = (int)EInputType.KeyUp;
+            self.OperateInfos.Add(operateInfo);
+        }
+
     }
 }

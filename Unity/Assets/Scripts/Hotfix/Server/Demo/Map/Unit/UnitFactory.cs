@@ -7,24 +7,28 @@ namespace ET.Server
 {
     public static partial class UnitFactory
     {
-        public static Unit Create(Scene scene, long id, UnitType unitType)
+        public static Unit Create(Scene scene, long id, EUnitType unitType)
         {
             UnitComponent unitComponent = scene.GetComponent<UnitComponent>();
             switch (unitType)
             {
-                case UnitType.Player:
+                case EUnitType.Player:
                 {
                     Unit unit = unitComponent.AddChildWithId<Unit, int>(id, 1001);
-                    unit.AddComponent<MoveComponent>();
-                    unit.Position = new float3(-10, 0, -10);
+                    unit.AddComponent<PlayerMoveComponent>();
 			
                     NumericComponent numericComponent = unit.AddComponent<NumericComponent>();
-                    numericComponent.Set(NumericType.Speed, 6f); // 速度是6米每秒
+                    numericComponent.Set(NumericType.Speed, 5f); // 速度是5米每秒
                     numericComponent.Set(NumericType.AOI, 15000); // 视野15米
-                    
+                    numericComponent.SetNoEvent(NumericType.MaxHp, unit.Config().Weight);
+                    numericComponent.SetNoEvent(NumericType.Hp, unit.Config().Weight);
+                    numericComponent.SetNoEvent(NumericType.Attack, 10);//默认攻击力10
+
                     unitComponent.Add(unit);
                     // 加入aoi
                     unit.AddComponent<AOIEntity, int, float3>(9 * 1000, unit.Position);
+                    
+                    unit.AddComponent<SkillComponent, List<int>>(new List<int>(){ 1001, 1002 });
                     return unit;
                 }
                 default:

@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿using System;
+using UnityEditor;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
@@ -8,10 +9,11 @@ using UnityEngine;
 
 using ET;
 using NUnit.Framework;
+using UnityEngine.UI;
 
 public partial class UICodeSpawner
 {
-	static public void SpawnEUICode(GameObject gameObject)
+	public static  void SpawnEUICode(GameObject gameObject)
 	{
 		if (null == gameObject)
 		{
@@ -26,6 +28,7 @@ public partial class UICodeSpawner
 			{
 				Debug.LogWarning($"----------开始生成Dlg{uiName} 相关代码 ----------");
 				SpawnDlgCode(gameObject);
+				SpawnDlgLoopItemResCode(gameObject);
 				Debug.LogWarning($"生成Dlg{uiName} 完毕!!!");
 				return;
 			}
@@ -53,7 +56,105 @@ public partial class UICodeSpawner
 	}
 	
 	
-    static public void SpawnDlgCode(GameObject gameObject)
+	public static void SpawnDlgLoopItemResCode(GameObject gameObject)
+	{
+		Path2WidgetCachedDict?.Clear();
+		Path2WidgetCachedDict = new Dictionary<string, List<Component>>();
+		FindAllWidgets(gameObject.transform, "",false);
+		CreateWindowItemReseCode(gameObject);
+		AssetDatabase.Refresh();
+	}
+	
+	
+	public static void CreateWindowItemReseCode(GameObject gameObject)
+	{
+		if (null == gameObject)
+		{
+			return;
+		}
+		
+		string strDlgName = gameObject.name;
+		HashSet<string> ItemResNames = new HashSet<string>();
+        foreach (KeyValuePair<string, List<Component>> pair in Path2WidgetCachedDict)
+        {
+	        foreach (var info in pair.Value)
+	        {
+		        Component widget = info;
+		        string widgetType = widget.GetType().ToString();
+				if (widgetType.Contains("Loop"))
+				{
+					LoopScrollRect loopScrollRect = widget as LoopScrollRect;
+					if (loopScrollRect != null)
+					{
+						ItemResNames.Add(loopScrollRect.prefabSource.prefabName);
+					}
+				}
+	        }
+        }
+
+        foreach (var itemResName in ItemResNames)
+        {
+	        Log.Info($"{strDlgName}面板需要预加载Item资源： {itemResName}");
+        }
+        
+        string strFilePath = Application.dataPath + "/Scripts/ModelView/Client/Plugins/EUI/WindowItemRes.cs";
+        if(!File.Exists(strFilePath))
+        {
+	        Debug.LogError(" 当前不存在WindowItemRes.cs!!!");
+	        return;
+        }
+	    
+        string WindowName = "WindowID_" + strDlgName.Substring(3);
+        string[] lines    = File.ReadAllLines(strFilePath);
+        int findIndex     = -1;
+        bool isDelete     = ItemResNames.Count <= 0;
+        
+        for (int i = 0; i < lines.Length; i++)
+        {
+	        string line = lines[i];
+	        int keywordIndex = line.IndexOf(WindowName);
+	        if (keywordIndex != -1)
+	        {
+		        CreateItemCode(lines, i, WindowName, ItemResNames);
+		        findIndex = i;
+		        break;
+	        }
+        }
+
+        if (isDelete && (findIndex != -1))
+        {
+	        List<string> linesList = new List<string>(lines);
+	        linesList.RemoveAt(findIndex);
+	        lines = linesList.ToArray();
+        }
+        else
+        {
+	        if (!isDelete && findIndex == -1)
+	        {
+		        // 在倒数第三行后插入新行
+		        int insertionIndex = lines.Length - 3;   // 倒数第三行的索引
+		        Array.Resize(ref lines, lines.Length + 1);   // 调整数组大小以容纳新行
+		        Array.Copy(lines, insertionIndex, lines, insertionIndex + 1, lines.Length - insertionIndex - 1);   // 向后移动行
+
+		        // 插入新行
+		        CreateItemCode(lines, insertionIndex, WindowName, ItemResNames);
+	        }
+        }
+        
+        File.WriteAllLines(strFilePath, lines);
+    }
+
+	private static void CreateItemCode(string[] lines, int i, string WindowName, HashSet<string> ItemResNames)
+	{
+		lines[i] = "\t\t\t{" + $" WindowID.{WindowName}, new List<string>()" + "{";
+		foreach (var itemResName in ItemResNames)
+		{
+			lines[i] += $"\"{itemResName}\",";
+		}
+		lines[i] += "}},";
+	}
+
+	public static void SpawnDlgCode(GameObject gameObject)
     {
 	    Path2WidgetCachedDict?.Clear();
         Path2WidgetCachedDict = new Dictionary<string, List<Component>>();
@@ -518,14 +619,14 @@ public partial class UICodeSpawner
 				    continue;
 			    }
 
-			     string widgetName = widget.name + strClassType.Split('.').ToList().Last();
+			    string widgetName = widget.name + strClassType.Split('.').ToList().Last();
 			    strBuilder.AppendFormat("\t\tprivate {0} m_{1} = null;\r\n", strClassType, widgetName);
 		    }
 		    
 	    }
     }
 
-    public static void FindAllWidgets(Transform trans, string strPath)
+    public static void FindAllWidgets(Transform trans, string strPath,bool isScanSubUI = true)
 	{
 		if (null == trans)
 		{
@@ -538,11 +639,20 @@ public partial class UICodeSpawner
 			
 		
 			bool isSubUI = child.name.StartsWith(CommonUIPrefix);
-			if (isSubUI || child.name.StartsWith(UIGameObjectPrefix))
+			if (isSubUI  || child.name.StartsWith(UIGameObjectPrefix))
 			{
 				List<Component> rectTransfomrComponents = new List<Component>(); 
 				rectTransfomrComponents.Add(child.GetComponent<RectTransform>());
-				Path2WidgetCachedDict.Add(child.name,rectTransfomrComponents);
+
+				if (Path2WidgetCachedDict.ContainsKey(child.name))
+				{
+					Log.Warning($"当前存在重复的Key:{strTemp}");
+				}
+				else
+				{
+					Path2WidgetCachedDict.Add(child.name,rectTransfomrComponents);
+				}
+				
 			}
 			else if (child.name.StartsWith(UIWidgetPrefix))
 			{
@@ -565,13 +675,15 @@ public partial class UICodeSpawner
 					Path2WidgetCachedDict.Add(child.name, componentsList);
 				}
 			}
-		
-			if (isSubUI)
+
+			
+			if (isScanSubUI && isSubUI)
 			{
 				Debug.Log($"遇到子UI：{child.name},不生成子UI项代码");
 				continue;
 			}
-			FindAllWidgets(child, strTemp);
+			
+			FindAllWidgets(child, strTemp,isScanSubUI);
 		}
 	}
 
@@ -605,7 +717,7 @@ public partial class UICodeSpawner
 	    strBuilder.AppendFormat("     			if( this.m_{0} == null )\n" , widget.ToLower());
 	    strBuilder.AppendLine("     			{");
 	    strBuilder.AppendFormat("		    	   Transform subTrans = UIFindHelper.FindDeepChild<Transform>(this.uiTransform.gameObject,\"{0}\");\r\n",  strPath);
-	    strBuilder.AppendFormat("		    	   this.m_{0} = this.AddChild<{1},Transform>(subTrans);\r\n", widget.ToLower(),subUIClassType);
+	    strBuilder.AppendFormat("		    	   this.m_{0} = this.AddChild<{1},Transform>(subTrans,true);\r\n", widget.ToLower(),subUIClassType);
 	    strBuilder.AppendLine("     			}");
 	    strBuilder.AppendFormat("     			return this.m_{0};\n" , widget.ToLower());
 	    strBuilder.AppendLine("     		}");
@@ -618,10 +730,12 @@ public partial class UICodeSpawner
 
     static UICodeSpawner()
     {
-        WidgetInterfaceList = new List<string>();        
+        WidgetInterfaceList = new List<string>();
+        WidgetInterfaceList.Add("Joystick");
         WidgetInterfaceList.Add("Button");
         WidgetInterfaceList.Add( "Text");
         WidgetInterfaceList.Add("TMPro.TextMeshProUGUI");
+        WidgetInterfaceList.Add( "TMPro.TMP_InputField");
         WidgetInterfaceList.Add("Input");
         WidgetInterfaceList.Add("InputField");
         WidgetInterfaceList.Add( "Scrollbar");
@@ -637,6 +751,7 @@ public partial class UICodeSpawner
         WidgetInterfaceList.Add("LoopVerticalScrollRect");
         WidgetInterfaceList.Add("LoopHorizontalScrollRect");
         WidgetInterfaceList.Add("UnityEngine.EventSystems.EventTrigger");
+        WidgetInterfaceList = WidgetInterfaceList.Distinct().ToList();
     }
 
     private static Dictionary<string, List<Component> > Path2WidgetCachedDict =null;

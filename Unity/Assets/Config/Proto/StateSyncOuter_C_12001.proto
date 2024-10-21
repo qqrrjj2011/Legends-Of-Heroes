@@ -15,14 +15,13 @@ message G2C_StateSyncMatch // ISessionResponse
 }
 
 /// 刷新匹配信息
-message Match2G_StateSyncRefreshMatch // IMessage
+message G2C_StateSyncRefreshMatch // IMessage
 {
 	int32 RpcId = 1;
-	/// 房间的ActorId
-	ActorId ActorId = 2;
-	/// 房间内玩家信息
-	RoomInfo RoomInfo = 3;
+	/// 房间信息
+	RoomInfo RoomInfo = 2;
 }
+
 
 /// 匹配成功，通知客户端切换场景
 message Match2G_StateSyncNotifyMatchSuccess // IMessage
@@ -58,4 +57,58 @@ message G2C_StateSyncReconnect // IMessage
 	repeated UnitInfo UnitInfos = 2;
 	int32 Frame = 3;
 }
+
+
+///////////////////////////////// Map Start ///////////////////////////////////
+
+message C2Room_JoystickMove // IRoomMessage
+{
+	int64 PlayerId = 1;
+	Unity.Mathematics.float3 MoveForward = 2;
+}
+
+message Room2C_JoystickMove // IMessage
+{
+	int64 Id = 1;
+	Unity.Mathematics.float3 Position = 2;
+	Unity.Mathematics.float3 MoveForward = 3;
+}
+
+
+message C2Room_Operation // IRoomMessage
+{
+	int64 PlayerId = 1;
+	int64 Id = 2;
+	repeated OperateInfo OperateInfos = 3;
+	
+}
+
+message Room2C_Operation // IMessage
+{
+	int64 Id = 1;
+	repeated OperateReplyInfo OperateInfos = 2;
+}
+
+message OperateInfo
+{
+    int32 OperateType = 1; //操作类型
+    int32 InputType = 2; //输入类型，按下/抬起
+	Unity.Mathematics.float3 Vec3 = 3; //v3参数
+	int64 Value1 = 4;
+	int64 Value2 = 5;
+}
+message OperateReplyInfo
+{
+    int32 OperateType = 1; //操作类型
+	int32 Status = 2;
+}
+
+message Room2C_SyncUnits // IMessage
+{
+	repeated UnitInfo Units = 1;
+}
+
+
+///////////////////////////////// Map End ///////////////////////////////////
+
 

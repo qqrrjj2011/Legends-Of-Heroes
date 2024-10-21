@@ -12,21 +12,22 @@ namespace ET.Client
 
 		public static void RegisterUIEvent(this DlgLogin self)
 		{
-			self.View.ELoginButton.AddListener(self.OnLogin);
+			self.View.ELoginButton.AddListener(self.Root(), self.OnLogin);
 			// self.View.ELoopTestLoopHorizontalScrollRect.AddItemRefreshListener(self.OnLoop);
 		}
 
 		public static void ShowWindow(this DlgLogin self, Entity contextData = null)
-		{
-			self.AddUIScrollItems(ref self.Dictionary,100);
-			// self.View.ELoopTestLoopHorizontalScrollRect.SetVisible(true,100);
-			// self.View.ESReuseUI.Test();
-		}
+        {
+            self.AddUIScrollItems(ref self.Dictionary, 100);
+            // self.View.ELoopTestLoopHorizontalScrollRect.SetVisible(true,100);
+            // self.View.ESReuseUI.Test();
+        }
 
 		public static void OnLoop(this DlgLogin self, Transform transform, int index)
-		{
-			Scroll_Item_test test = self.Dictionary[index].BindTrans(transform);
-			test.ELabel_ContentText.text = index.ToString();
+        {
+            Scroll_Item_test test = self.Dictionary[index];
+            test = test.BindTrans(transform);
+            test.ELabel_ContentText.text = index.ToString();
 		}
 
 		public static void OnLogin(this DlgLogin self)

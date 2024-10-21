@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using HybridCLR.Editor.Commands;
 using UnityEditor.Build.Reporting;
 using YooAsset.Editor;
+using ToolbarExtension;
 
 namespace ET
 {
@@ -60,7 +61,8 @@ namespace ET
 
         private void OnEnable()
         {
-            globalConfig = AssetDatabase.LoadAssetAtPath<GlobalConfig>("Assets/Resources/GlobalConfig.asset");
+            // globalConfig = AssetDatabase.LoadAssetAtPath<GlobalConfig>("Assets/Resources/GlobalConfig.asset");
+            globalConfig = AssetDatabase.LoadAssetAtPath<GlobalConfig>("Assets/Bundles/Config/GlobalConfig.asset");
 
 #if UNITY_ANDROID
             activePlatform = PlatformType.Android;
@@ -102,11 +104,11 @@ namespace ET
                     return;
                 }
 
-                if (this.globalConfig.EPlayMode == EPlayMode.EditorSimulateMode)
-                {
-                    Log.Error("build package EPlayMode must not be EPlayMode.EditorSimulateMode, please select HostPlayMode");
-                    return;
-                }
+                // if (this.globalConfig.EPlayMode == EPlayMode.EditorSimulateMode)
+                // {
+                //     Log.Error("build package EPlayMode must not be EPlayMode.EditorSimulateMode, please select HostPlayMode");
+                //     return;
+                // }
 
                 if (platformType != activePlatform)
                 {
@@ -143,6 +145,7 @@ namespace ET
                 FileHelper.CopyDirectory("../Config/Excel/c/GameConfig", clientProtoDir);
                 
                 AssetDatabase.Refresh();
+                EditorGUILayout.EndHorizontal();
                 return;
             }
             EditorGUILayout.EndHorizontal();
@@ -372,5 +375,36 @@ namespace ET
                 Debug.Log($"Build Failed" + summary.result);
             }
         }
+        
+        [Toolbar(OnGUISide.Left, 0)]
+        static void OnToolbarGUI()
+        {
+            if (GUILayout.Button("Proto2CS"))
+            {
+                ToolsEditor.Proto2CS();
+            }
+            if (GUILayout.Button("一键打包安卓"))
+            {
+                AutomationBuildAndroid();
+            }
+            /*if (GUILayout.Button("ExcelExporter"))
+            {
+                // ToolsEditor.ExcelExporter();
+
+                GlobalConfig globalConfig = AssetDatabase.LoadAssetAtPath<GlobalConfig>("Assets/Bundles/Config/GlobalConfig.asset");
+                ToolsEditor.ExcelExporter(globalConfig.CodeMode, this.configFolder);
+
+                const string clientProtoDir = "../Unity/Assets/Bundles/Config/GameConfig";
+                if (Directory.Exists(clientProtoDir))
+                {
+                    Directory.Delete(clientProtoDir, true);
+                }
+                FileHelper.CopyDirectory("../Config/Excel/c/GameConfig", clientProtoDir);
+
+                AssetDatabase.Refresh();
+                return;
+            }*/
+        }
+
     }
 }

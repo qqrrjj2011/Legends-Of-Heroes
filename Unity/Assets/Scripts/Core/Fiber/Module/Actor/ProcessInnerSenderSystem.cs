@@ -68,7 +68,7 @@ namespace ET
             }
             Run(actorMessageSender, response);
         }
-
+        
         private static void Run(MessageSenderStruct self, IResponse response)
         {
             if (response.Error == ErrorCore.ERR_MessageTimeout)
@@ -85,7 +85,7 @@ namespace ET
 
             self.SetResult(response);
         }
-
+        
         public static void Reply(this ProcessInnerSender self, Address fromAddress, IResponse message)
         {
             self.SendInner(new ActorId(fromAddress, 0), (MessageObject)message);
@@ -99,19 +99,13 @@ namespace ET
         private static bool SendInner(this ProcessInnerSender self, ActorId actorId, MessageObject message)
         {
             Fiber fiber = self.Fiber();
-
+            
             // 如果发向同一个进程，则扔到消息队列中
             if (actorId.Process != fiber.Process)
             {
                 throw new Exception($"actor inner process diff: {actorId.Process} {fiber.Process}");
             }
-
-            if (actorId.Fiber == fiber.Id)
-            {
-                self.HandleMessage(fiber, new MessageInfo() { ActorId = actorId, MessageObject = message });
-                return true;
-            }
-
+            
             return MessageQueue.Instance.Send(fiber.Address, actorId, message);
         }
 
@@ -129,12 +123,12 @@ namespace ET
         {
             int rpcId = self.GetRpcId();
             request.RpcId = rpcId;
-
+            
             if (actorId == default)
             {
                 throw new Exception($"actor id is 0: {request}");
             }
-
+            
             Fiber fiber = self.Fiber();
             if (fiber.Process != actorId.Process)
             {
@@ -142,16 +136,17 @@ namespace ET
             }
 
             Type requestType = request.GetType();
-            MessageSenderStruct messageSenderStruct = new(actorId, requestType, needException);
-            self.requestCallback.Add(rpcId, messageSenderStruct);
-
+            
             IResponse response;
             if (!self.SendInner(actorId, (MessageObject)request))  // 纤程不存在
             {
                 response = MessageHelper.CreateResponse(requestType, rpcId, ErrorCore.ERR_NotFoundActor);
                 return response;
             }
-
+            
+            MessageSenderStruct messageSenderStruct = new(actorId, requestType, needException);
+            self.requestCallback.Add(rpcId, messageSenderStruct);
+            
             async ETTask Timeout()
             {
                 await fiber.Root.GetComponent<TimerComponent>().WaitAsync(ProcessInnerSender.TIMEOUT_TIME);
@@ -160,7 +155,7 @@ namespace ET
                 {
                     return;
                 }
-
+                
                 if (needException)
                 {
                     action.SetException(new Exception($"actor sender timeout: {requestType.FullName}"));
@@ -171,13 +166,13 @@ namespace ET
                     action.SetResult(response);
                 }
             }
-
+            
             Timeout().Coroutine();
-
+            
             long beginTime = TimeInfo.Instance.ServerFrameTime();
 
             response = await messageSenderStruct.Wait();
-
+            
             long endTime = TimeInfo.Instance.ServerFrameTime();
 
             long costTime = endTime - beginTime;
@@ -185,7 +180,7 @@ namespace ET
             {
                 Log.Warning($"actor rpc time > 200: {costTime} {requestType.FullName}");
             }
-
+            
             return response;
         }
     }

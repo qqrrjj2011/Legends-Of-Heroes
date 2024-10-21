@@ -36,9 +36,15 @@ namespace ET.Client
             }
         }
         
-        public static async ETTask InitPoolFormGamObjectAsync(  GameObject pb, int size, PoolInflationType type = PoolInflationType.DOUBLE)
+        public static async ETTask<GameObject> GetGameObjectAsync(string gameObjectPath)
         {
-            string poolName = pb.name;
+            GameObject pb = null;
+            pb = await ResourcesComponent.Instance.LoadAssetAsync<GameObject>(gameObjectPath);
+            return pb;
+        }
+        
+        public static async ETTask InitPoolWithPathAsync( string poolName, string assetPath,int size, PoolInflationType type = PoolInflationType.DOUBLE)
+        {
             if (poolDict.ContainsKey(poolName))
             {
                 return;
@@ -47,11 +53,13 @@ namespace ET.Client
             {
                 try
                 {
+                    GameObject pb = await GetGameObjectAsync(assetPath);
                     if (pb == null)
                     {
                         Debug.LogError("[ResourceManager] Invalide prefab name for pooling :" + poolName);
                         return;
                     }
+                    
                     poolDict[poolName] = new GameObjectPool(poolName, pb, GameObject.Find("Global/PoolRoot"), size, type);
                 }
                 catch (Exception e)
@@ -59,9 +67,8 @@ namespace ET.Client
                     Debug.LogError(e);
                 }
             }
-
-            await ETTask.CompletedTask;
         }
+
         
         
         /// <summary>
@@ -77,6 +84,43 @@ namespace ET.Client
             if (!poolDict.ContainsKey(poolName) && autoCreate > 0)
             {
                 InitPool(poolName, autoCreate, PoolInflationType.INCREMENT);
+            }
+
+            if (poolDict.ContainsKey(poolName))
+            {
+                GameObjectPool pool = poolDict[poolName];
+                result = pool.NextAvailableObject(autoActive);
+                //scenario when no available object is found in pool
+#if UNITY_EDITOR
+                if (result == null)
+                {
+                    Debug.LogWarning("[ResourceManager]:No object available in " + poolName);
+                }
+#endif
+            }
+#if UNITY_EDITOR
+            else
+            {
+                Debug.LogError("[ResourceManager]:Invalid pool name specified: " + poolName);
+            }
+#endif
+            return result;
+        }
+
+        
+        /// <summary>
+        /// Returns an available object from the pool 
+        /// OR null in case the pool does not have any object available & can grow size is false.
+        /// </summary>
+        /// <OtherParam name="poolName"></OtherParam>
+        /// <returns></returns>
+        public static async ETTask<GameObject> GetObjectFromPoolAsync( string poolName,  string assetPath,  bool autoActive = true, int autoCreate = 0)
+        {
+            GameObject result = null;
+
+            if (!poolDict.ContainsKey(poolName) && autoCreate > 0)
+            {
+                await InitPoolWithPathAsync(poolName, assetPath,autoCreate, PoolInflationType.INCREMENT);
             }
 
             if (poolDict.ContainsKey(poolName))
